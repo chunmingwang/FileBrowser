@@ -14,22 +14,25 @@
 	#include once "mff/ImageList.bi"
 	#include once "mff/Menus.bi"
 	#include once "mff/StatusBar.bi"
+	#include once "mff/Panel.bi"
+	#include once "mff/CommandButton.bi"
 	
-	#include once "..\MDINotepad\FileAct.bi"
-	#include once "win\shlobj.bi"
+	#include once "../MDINotepad/FileAct.bi"
+	#include once "win/shlobj.bi"
 	
 	Using My.Sys.Forms
 	
 	Type frmBrowserType Extends Form
 		mImageList As ULong
-		mFileInfo As SHFILEINFO
 		mRootNode As TreeNode Ptr
 		mSelectPath As WString Ptr
-		mClose As Boolean 
+		mClosing As Boolean
+		mListing As Boolean
 		
 		Declare Function RootInit() As PTreeNode
 		Declare Sub RootList()
-		Declare Sub FileList(pathroot As WString, ByRef Item As TreeNode)
+		Declare Function FindNode(Path As WString) As TreeNode Ptr
+		Declare Sub FileList(ByRef Item As TreeNode, ByVal LV As Boolean = True)
 		
 		Declare Sub Form_Create(ByRef Sender As Control)
 		Declare Sub Form_Show(ByRef Sender As Form)
@@ -47,6 +50,10 @@
 		Declare Sub ListView1_Click(ByRef Sender As Control)
 		Declare Sub ListView1_ItemClick(ByRef Sender As ListView, ByVal ItemIndex As Integer)
 		Declare Sub MenuFile_Click(ByRef Sender As MenuItem)
+		Declare Sub ListView1_ItemDblClick(ByRef Sender As ListView, ByVal ItemIndex As Integer)
+		Declare Sub ComboBoxEx1_KeyPress(ByRef Sender As ComboBoxEdit, Key As Integer, Shift As Integer)
+		Declare Sub ComboBoxEx1_Selected(ByRef Sender As ComboBoxEdit, ItemIndex As Integer)
+		Declare Sub CommandButton1_Click(ByRef Sender As Control)
 		Declare Constructor
 		
 		Dim As ComboBoxEx ComboBoxEx1
@@ -57,6 +64,8 @@
 		Dim As StatusBar StatusBar1
 		Dim As StatusPanel StatusPanel1
 		Dim As Splitter Splitter1
+		Dim As Panel Panel1
+		Dim As CommandButton CommandButton1
 	End Type
 	
 	Constructor frmBrowserType
@@ -73,11 +82,21 @@
 			.Designer = @This
 			.OnCreate = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @Form_Create)
 			.OnShow = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Form), @Form_Show)
-			.Caption = "File Browser"
 			.OnResize = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control, NewWidth As Integer, NewHeight As Integer), @Form_Resize)
 			.OnClose = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Form, ByRef Action As Integer), @Form_Close)
+			.Caption = "File Browser"
 			.StartPosition = FormStartPosition.CenterScreen
 			.SetBounds 0, 0, 900, 700
+		End With
+		' Panel1
+		With Panel1
+			.Name = "Panel1"
+			.Text = "Panel1"
+			.TabIndex = 3
+			.Align = DockStyle.alTop
+			.SetBounds 0, 0, 884, 30
+			.Designer = @This
+			.Parent = @This
 		End With
 		' ComboBoxEx1
 		With ComboBoxEx1
@@ -85,13 +104,14 @@
 			.Text = ""
 			.TabIndex = 0
 			.Style = ComboBoxEditStyle.cbDropDown
-			.Align = DockStyle.alTop
-			.ExtraMargins.Top = 5
-			.ExtraMargins.Right = 5
-			.ExtraMargins.Left = 5
-			.SetBounds 5, 5, 874, 22
+			.ControlIndex = 0
+			.Anchor.Right = AnchorStyle.asAnchor
+			.Anchor.Left = AnchorStyle.asAnchor
+			.SetBounds 75, 5, 804, 22
 			.Designer = @This
-			.Parent = @This
+			.OnKeyPress = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ComboBoxEdit, Key As Integer, Shift As Integer), @ComboBoxEx1_KeyPress)
+			.OnSelected = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ComboBoxEdit, ItemIndex As Integer), @ComboBoxEx1_Selected)
+			.Parent = @Panel1
 		End With
 		' TreeView1
 		With TreeView1
@@ -103,15 +123,14 @@
 			.ExtraMargins.Right = 0
 			.ExtraMargins.Left = 5
 			.ExtraMargins.Bottom = 5
-			.EditLabels = True
 			.SetBounds 5, 32, 200, 602
 			.Designer = @This
-			.OnNodeClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeClick)
-			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @TreeView1_Click)
-			.OnNodeDblClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeDblClick)
-			.OnNodeActivate = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeActivate)
+			'.OnNodeClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeClick)
+			'.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @TreeView1_Click)
+			'.OnNodeDblClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeDblClick)
+			'.OnNodeActivate = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeActivate)
 			.OnSelChanged = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_SelChanged)
-			.OnSelChanging = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode, ByRef Cancel As Boolean), @TreeView1_SelChanging)
+			'.OnSelChanging = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode, ByRef Cancel As Boolean), @TreeView1_SelChanging)
 			.Parent = @This
 		End With
 		' Splitter1
@@ -139,12 +158,14 @@
 			.Anchor.Right = AnchorStyle.asAnchor
 			.Anchor.Left = AnchorStyle.asAnchor
 			.Anchor.Bottom = AnchorStyle.asAnchor
-			.SetBounds 200, 32, 679, 602
+			.Sort = SortStyle.ssNone
+			.SetBounds 210, 32, 669, 602
 			.Designer = @This
 			.OnResize = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control, NewWidth As Integer, NewHeight As Integer), @ListView1_Resize)
 			.OnSelectedItemChanged = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ListView, ByVal ItemIndex As Integer), @ListView1_SelectedItemChanged)
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @ListView1_Click)
 			.OnItemClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ListView, ByVal ItemIndex As Integer), @ListView1_ItemClick)
+			.OnItemDblClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ListView, ByVal ItemIndex As Integer), @ListView1_ItemDblClick)
 			.Parent = @This
 		End With
 		' StatusBar1
@@ -254,6 +275,17 @@
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuView_Click)
 			.Parent = @PopupMenu1
 		End With
+		' CommandButton1
+		With CommandButton1
+			.Name = "CommandButton1"
+			.Text = "Up"
+			.TabIndex = 4
+			.Caption = "Up"
+			.SetBounds 5, 5, 60, 22
+			.Designer = @This
+			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @CommandButton1_Click)
+			.Parent = @Panel1
+		End With
 	End Constructor
 	
 	Dim Shared frmBrowser As frmBrowserType
@@ -268,7 +300,7 @@
 '#End Region
 
 Private Sub frmBrowserType.Form_Show(ByRef Sender As Form)
-	'Debug.Print "TreeView1_Form_Show"
+	'Debug.Print "Form_Show"
 End Sub
 
 Private Sub frmBrowserType.TreeView1_NodeDblClick(ByRef Sender As TreeView, ByRef Item As TreeNode)
@@ -304,7 +336,7 @@ Private Sub frmBrowserType.ListView1_SelectedItemChanged(ByRef Sender As ListVie
 End Sub
 
 Private Sub frmBrowserType.Form_Resize(ByRef Sender As Control, NewWidth As Integer, NewHeight As Integer)
-	Debug.Print "Form_Resize"
+	'Debug.Print "Form_Resize"
 	With ListView1
 		.Columns.Column(0)->Width = .Width - 20 - .Columns.Column(1)->Width - .Columns.Column(2)->Width - .Columns.Column(3)->Width - .Columns.Column(4)->Width
 	End With
@@ -312,61 +344,78 @@ Private Sub frmBrowserType.Form_Resize(ByRef Sender As Control, NewWidth As Inte
 End Sub
 
 Private Sub frmBrowserType.Form_Create(ByRef Sender As Control)
-	Debug.Print "Form_Create"
-	Debug.Clear
-	mImageList = SHGetFileInfo("", 0, @mFileInfo, SizeOf(mFileInfo), SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_SMALLICON Or SHGFI_LARGEICON Or SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_TYPENAME Or SHGFI_ATTRIBUTES)
+	'Debug.Print "Form_Create"
+	'init combobox
+	ComboBoxEx1.AddItem("F:\OfficePC_Update\VB_FileAction\VB_FileBack4")
+	ComboBoxEx1.AddItem("F:\OfficePC_Update\!FB\Examples\FileBrowser")
+	ComboBoxEx1.AddItem("F:\OfficePC_Update\!FB\Examples\FileBrowser\FileBrowser.vfp")
+	
+	'init imagelist
+	Dim pFileInfo As SHFILEINFO
+	mImageList = SHGetFileInfo("", 0, @pFileInfo, SizeOf(pFileInfo), SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_SMALLICON Or SHGFI_LARGEICON Or SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_TYPENAME Or SHGFI_ATTRIBUTES)
 	SendMessage(TreeView1.Handle, TVM_SETIMAGELIST, TVSIL_NORMAL, Cast(LPARAM, mImageList))
 	SendMessage(ListView1.Handle, LVM_SETIMAGELIST, LVSIL_NORMAL, Cast(LPARAM, mImageList))
 	SendMessage(ListView1.Handle, LVM_SETIMAGELIST, LVSIL_SMALL, Cast(LPARAM, mImageList))
 	
-	mRootNode = RootInit()
-	RootList()
-	
+	'init columns of listview
 	ListView1.Columns.Add("Name", , 150)
 	ListView1.Columns.Add("Size", , 100, cfRight)
 	ListView1.Columns.Add("Write", , 120)
 	ListView1.Columns.Add("Creation", , 120)
 	ListView1.Columns.Add("Access", , 120)
+	
+	'init root of treeview
+	mRootNode = RootInit()
+	RootList()
+	mRootNode->Expand()
 End Sub
 
 Private Sub frmBrowserType.TreeView1_SelChanged(ByRef Sender As TreeView, ByRef Item As TreeNode)
-	Debug.Print "TreeView1_SelChanged"
-	If mClose Then Exit Sub
+	'Debug.Print "TreeView1_SelChanged"
+	If mClosing Then Exit Sub
+	If mListing Then Exit Sub
+	
+	mListing = True
+	'TreeView1.Enabled = False
 	
 	WLet(mSelectPath, Item.Name)
 	ComboBoxEx1.Text = *mSelectPath
 	Item.Nodes.Clear
 	ListView1.ListItems.Clear
 	
+	App.DoEvents()
+	
 	If *mSelectPath = "" Then
 		RootList()
-		
+		mRootNode->Expand()
 	Else
-		FileList(*mSelectPath, Item)
+		FileList(Item)
+		Item.Expand()
 	End If
+	mListing = False
+	'TreeView1.Enabled = True
 End Sub
 
 Private Function frmBrowserType.RootInit() As PTreeNode
-	Debug.Print "RootInit"
-	If mClose Then Return NULL
+	'Debug.Print "RootInit"
+	'my computer
+	Dim pIIDL As ITEMIDLIST Ptr
+	Dim pFileInfo As SHFILEINFO
 	
-	Dim lPIDL As ITEMIDLIST Ptr
-	Dim Path As WString Ptr = CAllocate(MAX_PATH)
-	
-	SHGetSpecialFolderLocation(NULL, CSIDL_DRIVES, @lPIDL)
-	SHGetPathFromIDList(lPIDL, Path)
-	SHGetFileInfo(Cast(LPCTSTR, lPIDL), 0, @mFileInfo, Len(mFileInfo), SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_SYSICONINDEX Or SHGFI_SMALLICON)
-	
-	Return TreeView1.Nodes.Add(mFileInfo.szDisplayName, *Path, *Path, mFileInfo.iIcon, mFileInfo.iIcon)
+	Dim pPath As WString * MAX_PATH
+	SHGetSpecialFolderLocation(NULL, CSIDL_DRIVES, @pIIDL)
+	SHGetPathFromIDList(pIIDL, @pPath)
+	SHGetFileInfo(Cast(LPCTSTR, pIIDL), 0, @pFileInfo, Len(pFileInfo), SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_SYSICONINDEX Or SHGFI_SMALLICON)
+	Return TreeView1.Nodes.Add(pFileInfo.szDisplayName, pPath, pPath, pFileInfo.iIcon, pFileInfo.iIcon)
 End Function
 
 Private Sub frmBrowserType.RootList()
-	Debug.Print "RootList"
-	If mClose Then Exit Sub
-	
-	Dim lPIDL As ITEMIDLIST Ptr
-	Dim Path As WString Ptr = CAllocate(MAX_PATH)
-	Dim mydi(4) As Long = { _
+	'Debug.Print "RootList"
+	'desktop,document,video,music
+	Dim pFileInfo As SHFILEINFO
+	Dim pIIDL As ITEMIDLIST Ptr
+	Dim pPath As WString * MAX_PATH
+	Dim pCSIDL(4) As Long = { _
 	CSIDL_DESKTOP, _
 	CSIDL_PERSONAL, _
 	CSIDL_MYMUSIC, _
@@ -374,104 +423,177 @@ Private Sub frmBrowserType.RootList()
 	CSIDL_MYVIDEO _
 	}
 	Dim i As Integer
-	
 	mRootNode->Nodes.Clear
-	
 	For i = 0 To 4
-		SHGetSpecialFolderLocation(NULL, mydi(i), @lPIDL)
-		SHGetPathFromIDList(lPIDL, Path)
-		SHGetFileInfo(Cast(LPCTSTR, lPIDL), 0, @mFileInfo, Len(mFileInfo), SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_SYSICONINDEX Or SHGFI_SMALLICON)
-		mRootNode->Nodes.Add(mFileInfo.szDisplayName, *Path, *Path, mFileInfo.iIcon, mFileInfo.iIcon)
+		SHGetSpecialFolderLocation(NULL, pCSIDL(i), @pIIDL)
+		SHGetPathFromIDList(pIIDL, @pPath)
+		SHGetFileInfo(Cast(LPCTSTR, pIIDL), 0, @pFileInfo, Len(pFileInfo), SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_SYSICONINDEX Or SHGFI_SMALLICON)
+		mRootNode->Nodes.Add(pFileInfo.szDisplayName, pPath, pPath, pFileInfo.iIcon, pFileInfo.iIcon)
 	Next
 	
-	Dim d As String * MAX_PATH
-	Dim n As WString Ptr = CAllocate(MAX_PATH)
-	Dim lpVolumeNameBuffer As WString Ptr = CAllocate(MAX_PATH)
+	'disks
+	Dim pListDrivers As String * MAX_PATH
+	Dim pDriver As WString * MAX_PATH
+	Dim lpVolumeNameBuffer As WString * MAX_PATH
 	Dim lpVolumeSerialNumber As DWORD
-	Dim lpFileSystemNameBuffer As WString Ptr = CAllocate(MAX_PATH)
-	
-	GetLogicalDriveStrings(MAX_PATH, Cast(WString Ptr, @d))
+	Dim lpFileSystemNameBuffer As WString * MAX_PATH'Ptr
+	GetLogicalDriveStrings(MAX_PATH, Cast(WString Ptr, @pListDrivers))
 	For i = 65 To 90
-		If InStr(d, WChr(i)) Then
-			*n = WChr(i) & ":"
-			GetVolumeInformation(n, lpVolumeNameBuffer, MAX_PATH, @lpVolumeSerialNumber, 0, 0, lpFileSystemNameBuffer, MAX_PATH)
-			SHGetFileInfo(n, FILE_ATTRIBUTE_NORMAL, @mFileInfo, SizeOf(mFileInfo), SHGFI_USEFILEATTRIBUTES Or SHGFI_SMALLICON Or SHGFI_SYSICONINDEX)
-			mRootNode->Nodes.Add(*lpVolumeNameBuffer & " (" & *n & ")", *n, *n, mFileInfo.iIcon, mFileInfo.iIcon)
+		If InStr(pListDrivers, WChr(i)) Then
+			pDriver = WChr(i) & ":"
+			GetVolumeInformation(pDriver & "\", @lpVolumeNameBuffer, MAX_PATH, @lpVolumeSerialNumber, 0, 0, @lpFileSystemNameBuffer, MAX_PATH)
+			SHGetFileInfo(pDriver, FILE_ATTRIBUTE_NORMAL, @pFileInfo, SizeOf(pFileInfo), SHGFI_USEFILEATTRIBUTES Or SHGFI_SMALLICON Or SHGFI_SYSICONINDEX)
+			mRootNode->Nodes.Add(lpVolumeNameBuffer & " (" & pDriver & ")", pDriver, pDriver, pFileInfo.iIcon, pFileInfo.iIcon)
 		End If
 	Next
-	
-	mRootNode->Expand()
 End Sub
 
-Private Sub frmBrowserType.FileList(pathroot As WString, ByRef Item As TreeNode)
-	Debug.Print "FileList"
-	If mClose Then Exit Sub
+Private Function frmBrowserType.FindNode(Path As WString) As TreeNode Ptr
+	Dim pSP() As WString Ptr
+	Dim i As Integer
+	Dim j As Integer
+	Dim k As Integer
+	Dim l As Integer
+	Dim d As Boolean
+	Dim n As TreeNodeCollection Ptr = @TreeView1.Nodes.Item(0)->Nodes
+	Dim sPath As WString Ptr = NULL
 	
-	Dim wfd As WIN32_FIND_DATA
+	Split(Path, "\", pSP())
+	j = UBound(pSP)
+	
+	For i = 0 To j
+		d = False
+		l = n->Count - 1
+		WLet(sPath, IIf(sPath = NULL, "", *sPath & "\") & *pSP(i))
+		'Debug.Print "i - " & i & " - " & *sPath
+		'Debug.Print "l - " & l
+		'Debug.Print String(10, Asc("="))
+		For k = 0 To l
+			'Debug.Print "k - " & k & " - " & n->Item(k)->Name
+			If n->Item(k)->Name = *sPath Then
+				If i = j Then
+					TreeView1.SelectedNode = n->Item(k)
+				Else
+					FileList(*n->Item(k), False)
+				End If
+				'n->Item(k)->Expand
+				n = @n->Item(k)->Nodes
+				d = True
+				Exit For
+			End If
+		Next
+		If d = False Then Exit For
+	Next
+	If sPath Then Deallocate(sPath)
+	ArrayDeallocate(pSP())
+	'Debug.Print i & "," & k & "," & d
+	If d Then
+		'TreeView1.SelectedNode = n->Item(k)
+		'Debug.Print "FindNode: " & n->Item(k)->Name
+		Return n->Item(k)
+	Else
+		Return NULL
+	End If
+End Function
+
+Private Sub frmBrowserType.FileList(ByRef Item As TreeNode, ByVal LV As Boolean = True)
+	'Debug.Print "FileList: " & Item.Name
+	Dim pFileInfo As SHFILEINFO
+	Dim pPath As WString * MAX_PATH
+	Dim pFullName As WString * MAX_PATH
+	Dim pWFD As WIN32_FIND_DATA
 	Dim hFind As Any Ptr
 	Dim hNext As WINBOOL
-	Dim fullname As WString Ptr
 	Dim i As Integer
-	hFind = FindFirstFile(pathroot & "\*.*", @wfd)
+	Dim pAdd As Boolean
+	
+	Dim pPCount As Integer
+	Dim pFCount As Integer
+	
+	hFind = FindFirstFile(Item.Name & "\*.*", @pWFD)
 	If hFind <> INVALID_HANDLE_VALUE Then
 		Do
-			If wfd.dwFileAttributes And FILE_ATTRIBUTE_DIRECTORY Then
-				If wfd.cFileName <> "." And wfd.cFileName <> ".." Then
-					WLet(fullname, pathroot & "\" & wfd.cFileName)
-					SHGetFileInfo(fullname, wfd.dwFileAttributes, @mFileInfo, SizeOf(mFileInfo), SHGFI_USEFILEATTRIBUTES Or SHGFI_SMALLICON Or SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_LARGEICON)
-					Item.Nodes.Add(wfd.cFileName, pathroot & "\" & wfd.cFileName, pathroot & "\" & wfd.cFileName, mFileInfo.iIcon, mFileInfo.iIcon)
-					ListView1.ListItems.Add(wfd.cFileName, mFileInfo.iIcon)
-					i = ListView1.ListItems.Count - 1
-					ListView1.ListItems.Item(i)->Text(2) = WFD2TimeStr(wfd.ftCreationTime)
-					ListView1.ListItems.Item(i)->Text(3) = WFD2TimeStr(wfd.ftLastAccessTime)
-					ListView1.ListItems.Item(i)->Text(4) = WFD2TimeStr(wfd.ftLastWriteTime)
+			pAdd = True
+			If pWFD.dwFileAttributes And FILE_ATTRIBUTE_DIRECTORY Then
+				If pWFD.cFileName = "." Or pWFD.cFileName = ".." Then
+					pAdd = False
 				End If
-			Else
-				WLet(fullname, pathroot & "\" & wfd.cFileName)
-				SHGetFileInfo(fullname, FILE_ATTRIBUTE_NORMAL, @mFileInfo, SizeOf(mFileInfo), SHGFI_USEFILEATTRIBUTES Or SHGFI_SMALLICON Or SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_LARGEICON)
-				ListView1.ListItems.Add(wfd.cFileName, mFileInfo.iIcon)
-				i = ListView1.ListItems.Count - 1
-				ListView1.ListItems.Item(i)->Text(1) = Format(WFD2Size(@wfd), "#,#")
-				ListView1.ListItems.Item(i)->Text(2) = WFD2TimeStr(wfd.ftLastWriteTime)
-				ListView1.ListItems.Item(i)->Text(3) = WFD2TimeStr(wfd.ftCreationTime)
-				ListView1.ListItems.Item(i)->Text(4) = WFD2TimeStr(wfd.ftLastAccessTime)
 			End If
-			hNext = FindNextFile(hFind , @wfd)
+			If pAdd Then
+				pFullName= Item.Name & "\" & pWFD.cFileName
+				SHGetFileInfo(pFullName, pWFD.dwFileAttributes, @pFileInfo, SizeOf(pFileInfo), SHGFI_USEFILEATTRIBUTES Or SHGFI_SMALLICON Or SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_LARGEICON)
+				If LV Then
+					ListView1.ListItems.Add(pWFD.cFileName, pFileInfo.iIcon)
+					i = ListView1.ListItems.Count - 1
+					ListView1.ListItems.Item(i)->Text(1) = Format(WFD2Size(@pWFD), "#,#")
+					ListView1.ListItems.Item(i)->Text(2) = WFD2TimeStr(pWFD.ftLastWriteTime)
+					ListView1.ListItems.Item(i)->Text(3) = WFD2TimeStr(pWFD.ftCreationTime)
+					ListView1.ListItems.Item(i)->Text(4) = WFD2TimeStr(pWFD.ftLastAccessTime)
+					If pWFD.dwFileAttributes And FILE_ATTRIBUTE_DIRECTORY Then
+						ListView1.ListItems.Item(i)->Text(1) = "<Dir>"
+						pPCount += 1
+					Else
+						ListView1.ListItems.Item(i)->Text(1) = Format(WFD2Size(@pWFD), "#,#")
+						pFCount += 1
+					End If
+				End If
+				If pWFD.dwFileAttributes And FILE_ATTRIBUTE_DIRECTORY Then
+					Item.Nodes.Add(pWFD.cFileName, pFullName, pFullName, pFileInfo.iIcon, pFileInfo.iIcon)
+					pPCount += 1
+				Else
+					pFCount += 1
+				End If
+			End If
+			hNext = FindNextFile(hFind , @pWFD)
 		Loop While (hNext)
 		FindClose(hFind)
 	End If
 	FindClose(hFind)
-	If fullname Then Deallocate(fullname)
-	If Item.Nodes.Count < 0 Then Exit Sub
-	Item.Expand
+	StatusPanel1.Caption = "Path count: " & pPCount & ", File Count: " & pFCount
 End Sub
 
 Private Sub frmBrowserType.MenuFile_Click(ByRef Sender As MenuItem)
-	Dim st As String
-	Dim file As String
+	'Debug.Print "MenuFile_Click"
+	Dim pTxt As String
+	Dim pFile As String
 	Dim i As Integer
-	
+	Dim c As Integer
+	Dim p As Boolean
 	Dim j As Integer = ListView1.ListItems.Count - 1
 	For i = 0 To j
 		If ListView1.ListItems.Item(i)->Selected Then
-			file = *mSelectPath & "\" & ListView1.ListItems.Item(i)->Text(0)
+			pFile = *mSelectPath & "\" & ListView1.ListItems.Item(i)->Text(0)
+			If ListView1.ListItems.Item(i)->Text(1) = "<Dir>" Then p = True
+			c += 1
 			Exit For
 		End If
 	Next
 	
 	Select Case Sender.Name
 	Case "MenuOpen"
-		st = "Open = " & ShellExecute (Handle, "open", file, "", "", 1)
+		If p Then
+			'is path
+			j = TreeView1.SelectedNode->Nodes.Count - 1
+			For i = 0 To j
+				If TreeView1.SelectedNode->Nodes.Item(i)->Name = pFile Then
+					TreeView1.SelectedNode = TreeView1.SelectedNode->Nodes.Item(i)
+					Exit For
+				End If
+			Next
+		Else
+			'is file
+			pTxt = "Open(" & pFile & ") = " & ShellExecute (Handle, "open", pFile, "", "", 1)
+		End If
 	Case "MenuNotepad"
-		st = "Notepad = " & Exec ("c:\windows\notepad.exe" , file)
+		pTxt = "Notepad(" & pFile & ") = " & Exec ("c:\windows\notepad.exe" , pFile)
 	Case "MenuBrowser"
-		st = "Browser = " & Exec ("c:\windows\explorer.exe" , "/select," & file)
+		pTxt = "Browser(" & pFile & ") = " & Exec ("c:\windows\explorer.exe" , "/select," & pFile)
 	End Select
-	StatusPanel1.Caption = st
+	StatusPanel1.Caption = pTxt
 End Sub
 
 Private Sub frmBrowserType.MenuView_Click(ByRef Sender As MenuItem)
-	Debug.Print "MenuView_Click"
+	'Debug.Print "MenuView_Click"
 	MenuItem1.Checked = False
 	MenuItem1.Checked = False
 	MenuItem2.Checked = False
@@ -484,20 +606,50 @@ Private Sub frmBrowserType.MenuView_Click(ByRef Sender As MenuItem)
 End Sub
 
 Private Sub frmBrowserType.Form_Close(ByRef Sender As Form, ByRef Action As Integer)
-	Debug.Print "Form_Close"
-	mClose = True
+	'Debug.Print "Form_Close"
+	mClosing = True
 	App.DoEvents()
-	
+	If mSelectPath Then Deallocate(mSelectPath)
 	ListView1.ListItems.Clear
 	TreeView1.Nodes.Clear
 End Sub
 
 Private Sub frmBrowserType.ListView1_ItemClick(ByRef Sender As ListView, ByVal ItemIndex As Integer)
-	Debug.Print "ListView1_ItemClick" & ItemIndex
+	'Debug.Print "ListView1_ItemClick" & ItemIndex
+	Dim i As Integer
+	Dim c As Integer
+	Dim j As Integer = ListView1.ListItems.Count - 1
+	For i = 0 To j
+		If ListView1.ListItems.Item(i)->Selected Then
+			c += 1
+		End If
+	Next
+	
 	If ItemIndex < 0 Then
-		StatusPanel1.Caption = *mSelectPath & ItemIndex
+		StatusPanel1.Caption = j + 1 & " items, " & c & " selected none"
 	Else
-		StatusPanel1.Caption = *mSelectPath & "\" & ListView1.ListItems.Item(ItemIndex)->Text(0)
+		StatusPanel1.Caption = j + 1 & " items, " & c & " selected: " & *mSelectPath & "\" & ListView1.ListItems.Item(ItemIndex)->Text(0)
 	End If
 End Sub
 
+Private Sub frmBrowserType.ListView1_ItemDblClick(ByRef Sender As ListView, ByVal ItemIndex As Integer)
+	'Debug.Print "ListView1_ItemDblClick" & ItemIndex
+	MenuFile_Click(MenuOpen)
+End Sub
+
+Private Sub frmBrowserType.ComboBoxEx1_KeyPress(ByRef Sender As ComboBoxEdit, Key As Integer, Shift As Integer)
+	'Debug.Print "ComboBoxEx1_KeyPress: " & Key & ComboBoxEx1.Text
+	If Key <> 13 Then Exit Sub
+	FindNode(ComboBoxEx1.Text)
+End Sub
+
+Private Sub frmBrowserType.ComboBoxEx1_Selected(ByRef Sender As ComboBoxEdit, ItemIndex As Integer)
+	'Debug.Print "ComboBoxEx1_Selected: " & ComboBoxEx1.Item(ItemIndex)
+	FindNode(ComboBoxEx1.Item(ItemIndex))
+End Sub
+
+Private Sub frmBrowserType.CommandButton1_Click(ByRef Sender As Control)
+	'Debug.Print "CommandButton1_Click: " & TreeView1.SelectedNode->ParentNode
+	If TreeView1.SelectedNode->ParentNode = NULL Then Exit Sub
+	TreeView1.SelectedNode = TreeView1.SelectedNode->ParentNode
+End Sub
