@@ -1,4 +1,4 @@
 # FileBrowser
 Example for VisualFBEditor
 
-![image](https://github.com/chunmingwang/FileBrowser/assets/35757455/3f1315e2-ef5d-4230-aa11-c1a77717b92a)
+![image](https://github.com/chunmingwang/FileBrowser/assets/35757455/47ed9c1a-f2ca-414f-8b1d-860004a45999)
