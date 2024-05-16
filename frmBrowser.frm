@@ -7,6 +7,7 @@
 		Const _MAIN_FILE_ = __FILE__
 	#endif
 	#include once "mff/Form.bi"
+	#include once "mff/sys.bi"
 	#include once "mff/ComboBoxEx.bi"
 	#include once "mff/TreeView.bi"
 	#include once "mff/ListView.bi"
@@ -23,11 +24,12 @@
 	Using My.Sys.Forms
 	
 	Type frmBrowserType Extends Form
-		mImageList As ULong
 		mRootNode As TreeNode Ptr
 		mSelectPath As WString Ptr
 		mClosing As Boolean
 		mListing As Boolean
+		
+		Declare Function Path2ComboEx Overload (ByRef Sender As ComboBoxEx, Path As Const WString) As Integer
 		
 		Declare Function RootInit() As PTreeNode
 		Declare Sub RootList()
@@ -66,25 +68,30 @@
 		Dim As Splitter Splitter1
 		Dim As Panel Panel1
 		Dim As CommandButton CommandButton1
+		Dim As ImageList ImageList1
 	End Type
 	
 	Constructor frmBrowserType
 		#if _MAIN_FILE_ = __FILE__
 			With App
 				.CurLanguagePath = ExePath & "/Languages/"
-				.CurLanguage = "english"
+				.CurLanguage = My.Sys.Language
 			End With
 		#endif
 		' frmBrowser
 		With This
 			.Name = "frmBrowser"
-			.Text = "File Browser"
+			.Text = ML("File Browser")
+			#ifdef __USE_GTK__
+				.Icon.LoadFromFile(ExePath & "../../Resources/VisualFBEditor.ico")
+			#else
+				.Icon.LoadFromResourceID(1)
+			#endif
 			.Designer = @This
 			.OnCreate = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @Form_Create)
 			.OnShow = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Form), @Form_Show)
 			.OnResize = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control, NewWidth As Integer, NewHeight As Integer), @Form_Resize)
 			.OnClose = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Form, ByRef Action As Integer), @Form_Close)
-			.Caption = "File Browser"
 			.StartPosition = FormStartPosition.CenterScreen
 			.SetBounds 0, 0, 900, 700
 		End With
@@ -98,6 +105,16 @@
 			.Designer = @This
 			.Parent = @This
 		End With
+		' CommandButton1
+		With CommandButton1
+			.Name = "CommandButton1"
+			.Text = ML("Up")
+			.TabIndex = 4
+			.SetBounds 5, 5, 60, 22
+			.Designer = @This
+			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @CommandButton1_Click)
+			.Parent = @Panel1
+		End With
 		' ComboBoxEx1
 		With ComboBoxEx1
 			.Name = "ComboBoxEx1"
@@ -107,6 +124,7 @@
 			.ControlIndex = 0
 			.Anchor.Right = AnchorStyle.asAnchor
 			.Anchor.Left = AnchorStyle.asAnchor
+			.ImagesList = @ImageList1
 			.SetBounds 75, 5, 804, 22
 			.Designer = @This
 			.OnKeyPress = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ComboBoxEdit, Key As Integer, Shift As Integer), @ComboBoxEx1_KeyPress)
@@ -123,7 +141,9 @@
 			.ExtraMargins.Right = 0
 			.ExtraMargins.Left = 5
 			.ExtraMargins.Bottom = 5
-			.SetBounds 5, 32, 200, 602
+			.Images = @ImageList1
+			.SelectedImages = @ImageList1
+			.SetBounds 5, 35, 200, 599
 			.Designer = @This
 			'.OnNodeClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As TreeView, ByRef Item As TreeNode), @TreeView1_NodeClick)
 			'.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @TreeView1_Click)
@@ -159,7 +179,9 @@
 			.Anchor.Left = AnchorStyle.asAnchor
 			.Anchor.Bottom = AnchorStyle.asAnchor
 			.Sort = SortStyle.ssNone
-			.SetBounds 210, 32, 669, 602
+			.SmallImages = @ImageList1
+			.Images = @ImageList1
+			.SetBounds 210, 35, 669, 599
 			.Designer = @This
 			.OnResize = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control, NewWidth As Integer, NewHeight As Integer), @ListView1_Resize)
 			.OnSelectedItemChanged = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As ListView, ByVal ItemIndex As Integer), @ListView1_SelectedItemChanged)
@@ -194,7 +216,7 @@
 		With MenuOpen
 			.Name = "MenuOpen"
 			.Designer = @This
-			.Caption = "Open"
+			.Caption = ML("Open")
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuFile_Click)
 			.Parent = @PopupMenu1
 		End With
@@ -202,7 +224,7 @@
 		With MenuNotepad
 			.Name = "MenuNotepad"
 			.Designer = @This
-			.Caption = "Notepad"
+			.Caption = ML("Notepad")
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuFile_Click)
 			.Parent = @PopupMenu1
 		End With
@@ -210,7 +232,7 @@
 		With MenuBrowser
 			.Name = "MenuBrowser"
 			.Designer = @This
-			.Caption = "Browser"
+			.Caption = ML("Browser")
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuFile_Click)
 			.Parent = @PopupMenu1
 		End With
@@ -225,7 +247,7 @@
 		With MenuItem1
 			.Name = "MenuItem1"
 			.Designer = @This
-			.Caption = "Icon"
+			.Caption = ML("Icon")
 			.Tag = @"0"
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuView_Click)
 			.Parent = @PopupMenu1
@@ -234,7 +256,7 @@
 		With MenuItem2
 			.Name = "MenuItem2"
 			.Designer = @This
-			.Caption = "Detials"
+			.Caption = ML("Details")
 			.Tag = @"1"
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuView_Click)
 			.Parent = @PopupMenu1
@@ -252,7 +274,7 @@
 		With MenuItem4
 			.Name = "MenuItem4"
 			.Designer = @This
-			.Caption = "List"
+			.Caption = ML("List")
 			.Tag = @"3"
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuView_Click)
 			.Parent = @PopupMenu1
@@ -261,7 +283,7 @@
 		With MenuItem5
 			.Name = "MenuItem5"
 			.Designer = @This
-			.Caption = "Title"
+			.Caption = ML("Title")
 			.Tag = @"4"
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuView_Click)
 			.Parent = @PopupMenu1
@@ -270,20 +292,16 @@
 		With MenuItem6
 			.Name = "MenuItem6"
 			.Designer = @This
-			.Caption = "Max"
+			.Caption = ML("Max")
 			.Tag = @"5"
 			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As MenuItem), @MenuView_Click)
 			.Parent = @PopupMenu1
 		End With
-		' CommandButton1
-		With CommandButton1
-			.Name = "CommandButton1"
-			.Text = "Up"
-			.TabIndex = 4
-			.Caption = "Up"
-			.SetBounds 5, 5, 60, 22
+		' ImageList1
+		With ImageList1
+			.Name = "ImageList1"
+			.SetBounds 20, 0, 16, 16
 			.Designer = @This
-			.OnClick = Cast(Sub(ByRef Designer As My.Sys.Object, ByRef Sender As Control), @CommandButton1_Click)
 			.Parent = @Panel1
 		End With
 	End Constructor
@@ -345,24 +363,24 @@ End Sub
 
 Private Sub frmBrowserType.Form_Create(ByRef Sender As Control)
 	'Debug.Print "Form_Create"
-	'init combobox
-	ComboBoxEx1.AddItem("F:\OfficePC_Update\VB_FileAction\VB_FileBack4")
-	ComboBoxEx1.AddItem("F:\OfficePC_Update\!FB\Examples\FileBrowser")
-	ComboBoxEx1.AddItem("F:\OfficePC_Update\!FB\Examples\FileBrowser\FileBrowser.vfp")
 	
 	'init imagelist
 	Dim pFileInfo As SHFILEINFO
-	mImageList = SHGetFileInfo("", 0, @pFileInfo, SizeOf(pFileInfo), SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_SMALLICON Or SHGFI_LARGEICON Or SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_TYPENAME Or SHGFI_ATTRIBUTES)
-	SendMessage(TreeView1.Handle, TVM_SETIMAGELIST, TVSIL_NORMAL, Cast(LPARAM, mImageList))
-	SendMessage(ListView1.Handle, LVM_SETIMAGELIST, LVSIL_NORMAL, Cast(LPARAM, mImageList))
-	SendMessage(ListView1.Handle, LVM_SETIMAGELIST, LVSIL_SMALL, Cast(LPARAM, mImageList))
+	ImageList1.Handle = Cast(Any Ptr, SHGetFileInfo("", 0, @pFileInfo, SizeOf(pFileInfo), SHGFI_SYSICONINDEX Or SHGFI_ICON Or SHGFI_SMALLICON Or SHGFI_LARGEICON Or SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_TYPENAME Or SHGFI_ATTRIBUTES))
+	SendMessage(TreeView1.Handle, TVM_SETIMAGELIST, TVSIL_NORMAL, Cast(LPARAM, ImageList1.Handle))
+	SendMessage(ListView1.Handle, LVM_SETIMAGELIST, LVSIL_NORMAL, Cast(LPARAM, ImageList1.Handle))
+	SendMessage(ListView1.Handle, LVM_SETIMAGELIST, LVSIL_SMALL, Cast(LPARAM, ImageList1.Handle))
 	
 	'init columns of listview
-	ListView1.Columns.Add("Name", , 150)
-	ListView1.Columns.Add("Size", , 100, cfRight)
-	ListView1.Columns.Add("Write", , 120)
-	ListView1.Columns.Add("Creation", , 120)
-	ListView1.Columns.Add("Access", , 120)
+	ListView1.Columns.Add(ML("Name"), , 150)
+	ListView1.Columns.Add(ML("Size"), , 100, cfRight)
+	ListView1.Columns.Add(ML("Write"), , 120)
+	ListView1.Columns.Add(ML("Creation"), , 120)
+	ListView1.Columns.Add(ML("Access"), , 120)
+	
+	'init combobox
+	Path2ComboEx(ComboBoxEx1, "F:\OfficePC_Update\VB_FileAction\VB_FileBack4")
+	Path2ComboEx(ComboBoxEx1, "F:\OfficePC_Update\!FB\Examples\FileBrowser")
 	
 	'init root of treeview
 	mRootNode = RootInit()
@@ -370,16 +388,29 @@ Private Sub frmBrowserType.Form_Create(ByRef Sender As Control)
 	mRootNode->Expand()
 End Sub
 
+Private Function frmBrowserType.Path2ComboEx(ByRef Sender As ComboBoxEx, Path As Const WString) As Integer
+	'If Path = "" Then Return -1
+	Dim i As Integer = Sender.IndexOf("" + Path)
+	If i < 0 Then
+		Dim FileInfo As SHFILEINFO
+		SHGetFileInfo(Path, FILE_ATTRIBUTE_DEVICE Or FILE_ATTRIBUTE_DIRECTORY, @FileInfo, SizeOf(FileInfo), SHGFI_USEFILEATTRIBUTES Or SHGFI_SMALLICON Or SHGFI_SYSICONINDEX)
+		Sender.Items.Add("" + Path, , FileInfo.iIcon, FileInfo.iIcon, FileInfo.iIcon)
+		i = Sender.IndexOf("" + Path)
+	End If
+	Return i
+End Function
+
 Private Sub frmBrowserType.TreeView1_SelChanged(ByRef Sender As TreeView, ByRef Item As TreeNode)
 	'Debug.Print "TreeView1_SelChanged"
 	If mClosing Then Exit Sub
 	If mListing Then Exit Sub
 	
 	mListing = True
-	'TreeView1.Enabled = False
 	
 	WLet(mSelectPath, Item.Name)
-	ComboBoxEx1.Text = *mSelectPath
+	Dim i As Integer = Path2ComboEx(ComboBoxEx1, *mSelectPath)
+	ComboBoxEx1.ItemIndex = i
+	
 	Item.Nodes.Clear
 	ListView1.ListItems.Clear
 	
@@ -427,7 +458,7 @@ Private Sub frmBrowserType.RootList()
 	For i = 0 To 4
 		SHGetSpecialFolderLocation(NULL, pCSIDL(i), @pIIDL)
 		SHGetPathFromIDList(pIIDL, @pPath)
-		SHGetFileInfo(Cast(LPCTSTR, pIIDL), 0, @pFileInfo, Len(pFileInfo), SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_SYSICONINDEX Or SHGFI_SMALLICON)
+		SHGetFileInfo(Cast(LPCTSTR, pIIDL), 0, @pFileInfo, SizeOf(pFileInfo), SHGFI_PIDL Or SHGFI_DISPLAYNAME Or SHGFI_SYSICONINDEX Or SHGFI_SMALLICON)
 		mRootNode->Nodes.Add(pFileInfo.szDisplayName, pPath, pPath, pFileInfo.iIcon, pFileInfo.iIcon)
 	Next
 	
@@ -626,9 +657,9 @@ Private Sub frmBrowserType.ListView1_ItemClick(ByRef Sender As ListView, ByVal I
 	Next
 	
 	If ItemIndex < 0 Then
-		StatusPanel1.Caption = j + 1 & " items, " & c & " selected none"
+		StatusPanel1.Caption = j + 1 & " " & ML("items") & ", " & c & " " & ML("selected None.")
 	Else
-		StatusPanel1.Caption = j + 1 & " items, " & c & " selected: " & *mSelectPath & "\" & ListView1.ListItems.Item(ItemIndex)->Text(0)
+		StatusPanel1.Caption = j + 1 & " " & ML("items") & ", " & c & ", " & ML("selected:") & *mSelectPath & " \ " & ListView1.ListItems.Item(ItemIndex)->Text(0)
 	End If
 End Sub
 
